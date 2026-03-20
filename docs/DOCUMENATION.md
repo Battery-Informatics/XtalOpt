@@ -78,6 +78,7 @@ You might encounter issues during the build. If so, edit the makefile:
 
 - Comment out the following lines from 252-255
   ![alt text](image-5.png)
+  
 - Then edit line 22
   ![alt text](image-6.png)
 
