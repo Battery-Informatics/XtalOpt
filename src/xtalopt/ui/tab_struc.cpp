@@ -47,6 +47,8 @@ TabStruc::TabStruc(GlobalSearch::AbstractDialog* parent, XtalOpt* p)
   // Composition
   connect(ui.edit_composition, SIGNAL(returnPressed()), this,
           SLOT(getComposition()));
+  connect(ui.edit_fixed_stoich, SIGNAL(returnPressed()), this,
+          SLOT(updateFixedStoichiometry()));
 
   // Search type
   connect(ui.cb_vcsearch, SIGNAL(clicked(bool)), this,
@@ -144,6 +146,7 @@ TabStruc::TabStruc(GlobalSearch::AbstractDialog* parent, XtalOpt* p)
   ui.table_molUnit->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
   ui.table_IAD->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
   ui.edit_composition->setPlaceholderText("Press 'return' after entering or adjusting input...");
+  ui.edit_fixed_stoich->setPlaceholderText("Optional fixed counts, e.g. Li=1, O=2");
   ui.edit_ele_vols->setPlaceholderText("Press 'return' after entering or adjusting input...");
   ui.edit_ref_enes->setPlaceholderText("Press 'return' after entering or adjusting input...");
   // Weirdly, and when compiled without debug flags; these push buttons receive 'return'
@@ -285,6 +288,7 @@ void TabStruc::updateGUI()
   ui.spin_vol_max->setValue(xtalopt->vol_max);
 
   ui.edit_composition->setText(xtalopt->input_formulas_string);
+  ui.edit_fixed_stoich->setText(xtalopt->input_fixed_stoich_string);
   ui.edit_ele_vols->setText(xtalopt->input_ele_volm_string);
   ui.edit_ref_enes->setText(xtalopt->input_ene_refs_string);
 
@@ -298,6 +302,7 @@ void TabStruc::updateGUI()
 void TabStruc::lockGUI()
 {
   ui.edit_composition->setDisabled(true);
+  ui.edit_fixed_stoich->setDisabled(true);
   ui.cb_useMolUnit->setDisabled(true);
   ui.table_molUnit->setDisabled(true);
   ui.pushButton_addMolUnit->setDisabled(true);
@@ -331,14 +336,26 @@ void TabStruc::getComposition()
     // We will be here if: (1) input text is re-entered after a list
     //   was already set, and (2) the new list is incorrect or empty.
     errorPromptWindow("Invalid or no chemical formula entry!");
+
+    if (!init_formula_input.isEmpty()) {
+      ui.edit_composition->setText(init_formula_input);
+      xtalopt->processInputChemicalFormulas(init_formula_input);
+      xtalopt->processFixedStoichiometry(xtalopt->input_fixed_stoich_string);
+      updateCompositionTable();
+      return;
+    }
+
     //
     // To avoid any issues, we reset everything.
     //
     // Reset composition
     ui.edit_composition->clear();
+    ui.edit_fixed_stoich->clear();
     ui.table_comp->setRowCount(0);
     xtalopt->input_formulas_string.clear();
+    xtalopt->input_fixed_stoich_string.clear();
     xtalopt->compList.clear();
+    xtalopt->fixedStoich.clear();
     // Reset reference energies
     ui.edit_ref_enes->clear();
     xtalopt->input_ene_refs_string.clear();
@@ -376,6 +393,13 @@ void TabStruc::getComposition()
 
   // Update the input string (needed to write state file etc)
   xtalopt->input_formulas_string = ui.edit_composition->text();
+
+  if (!xtalopt->processFixedStoichiometry(xtalopt->input_fixed_stoich_string)) {
+    errorPromptWindow("Current fixed stoichiometry is incompatible with the chemical formulas.");
+    ui.edit_composition->setText(init_formula_input);
+    xtalopt->processInputChemicalFormulas(init_formula_input);
+    return;
+  }
 
   // Reset reference energies
   ui.edit_ref_enes->clear();
@@ -444,10 +468,43 @@ void TabStruc::updateAtomCountLimits()
     ui.sb_min_atoms->setValue(minimum_atoms_in_compositions);
   }
 
+  const int fixedAtoms = xtalopt->fixedStoich.getNumAtoms();
+  if (fixedAtoms > xtalopt->maxAtoms) {
+    xtalopt->maxAtoms = fixedAtoms;
+    ui.sb_max_atoms->setValue(fixedAtoms);
+  }
+  if (fixedAtoms > xtalopt->minAtoms) {
+    xtalopt->minAtoms = fixedAtoms;
+    ui.sb_min_atoms->setValue(fixedAtoms);
+  }
+
   connect(ui.sb_max_atoms, SIGNAL(valueChanged(int)), this,
           SLOT(updateAtomCountLimits()));
   connect(ui.sb_min_atoms, SIGNAL(valueChanged(int)), this,
           SLOT(updateAtomCountLimits()));
+}
+
+void TabStruc::updateFixedStoichiometry()
+{
+  XtalOpt* xtalopt = qobject_cast<XtalOpt*>(m_search);
+
+  if (xtalopt->compList.isEmpty()) {
+    errorPromptWindow("Set the composition first!");
+    ui.edit_fixed_stoich->clear();
+    return;
+  }
+
+  const QString initialInput = xtalopt->input_fixed_stoich_string;
+  const QString inputText = ui.edit_fixed_stoich->text();
+
+  if (!xtalopt->processFixedStoichiometry(inputText)) {
+    ui.edit_fixed_stoich->setText(initialInput);
+    errorPromptWindow("Invalid fixed stoichiometry entry. Use entries like Li=1, O=2.");
+    return;
+  }
+
+  xtalopt->input_fixed_stoich_string = inputText;
+  updateAtomCountLimits();
 }
 
 void TabStruc::updateReferenceEnergies()

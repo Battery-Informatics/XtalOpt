@@ -313,6 +313,9 @@ public:
   // Convert a string of chemical formula to composition object
   CellComp formulaToComposition(QString form);
 
+  // Process a string of fixed element counts, e.g. "Li=1, O=2"
+  bool processFixedStoichiometry(QString s);
+
   // Compare two composition object if they are equivalent/supercell or not
   double compareCompositions(CellComp comp1, CellComp comp2);
 
@@ -328,6 +331,8 @@ public:
   // Get the sorted full list of chemical element in the current run (reference chemical system)
   // Also, overrides a searchbase function so access to this info is provided there for hull calcs.
   QList<QString> getChemicalSystem() const override;
+
+  bool compositionMatchesFixedStoichiometry(const CellComp& comp) const;
 
   // Process input formulas string and produce composition objects
   bool processInputChemicalFormulas(QString s);
@@ -348,6 +353,7 @@ public:
   //   and at the time of resuming a run, we read that and process it
   //   to obtain the actual composition list.
   QString input_formulas_string;  // Input string for chemical formulas
+  QString input_fixed_stoich_string; // Input string for fixed element counts
   QString input_ene_refs_string;  // Input string for reference energies
   QString input_ele_volm_string;  // Input string for elemental volumes
 
@@ -355,6 +361,7 @@ public:
   QList<RefEnergy> refEnergies;// Reference energies
   EleRadii  eleMinRadii;       // Elemental minimum radii
   EleVolume eleVolumes;        // Elemental volumes
+  CellComp fixedStoich;        // Fixed atom counts for a subset of elements
 
   int maxAtoms;                // Maximum number of atoms in the run
   int minAtoms;                // Minimum number of atoms in the run

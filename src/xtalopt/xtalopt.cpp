@@ -474,6 +474,7 @@ bool XtalOpt::save(QString filename, bool notify)
   settings->setValue("vcSearch", vcSearch);
   settings->setValue("referenceEnergies", input_ene_refs_string);
   settings->setValue("chemical_formulas", input_formulas_string);
+  settings->setValue("fixed_stoichiometry", input_fixed_stoich_string);
 
   // Mol Unit stuff
   if (using_molUnit) {
@@ -793,6 +794,9 @@ bool XtalOpt::readSettings(const QString& filename)
     //   "valid" outputs; so won't check if they return true or false.
     input_formulas_string = settings->value("chemical_formulas").toString();
     processInputChemicalFormulas(input_formulas_string);
+    input_fixed_stoich_string = settings->value("fixed_stoichiometry").toString();
+    if (!processFixedStoichiometry(input_fixed_stoich_string))
+      return false;
     input_ene_refs_string = settings->value("referenceEnergies").toString();
     processInputReferenceEnergies(input_ene_refs_string);
     input_ele_volm_string = settings->value("limits/volume/elemental").toString();
@@ -2197,6 +2201,11 @@ bool XtalOpt::checkComposition(Xtal* xtal, bool isSeed)
       qDebug() << "Error checkComposition: unknown types in the xtal.";
       return false;
     }
+
+  if (!compositionMatchesFixedStoichiometry(comp)) {
+    qDebug() << "Error checkComposition: structure violates fixed stoichiometry.";
+    return false;
+  }
 
   // If a seed structure; we're done except than:
   // (1) if seed is a sub-system or it's composition is not on the list, mark it
@@ -3731,6 +3740,16 @@ QList<QString> XtalOpt::getChemicalSystem() const
   return out;
 }
 
+bool XtalOpt::compositionMatchesFixedStoichiometry(const CellComp& comp) const
+{
+  for (const auto& symbol : fixedStoich.getSymbols()) {
+    if (comp.getCount(symbol) != fixedStoich.getCount(symbol))
+      return false;
+  }
+
+  return true;
+}
+
 bool XtalOpt::processInputChemicalFormulas(QString s)
 {
   // This function, one of the first things to be called, processes
@@ -3839,6 +3858,13 @@ bool XtalOpt::processInputChemicalFormulas(QString s)
     }
   }
 
+  for (const auto& comp : out) {
+    if (!compositionMatchesFixedStoichiometry(comp)) {
+      qDebug() << "Error: chemical formula entry violates fixed stoichiometry.";
+      return false;
+    }
+  }
+
   // Set the composition list
   compList = out;
 
@@ -3852,6 +3878,68 @@ bool XtalOpt::processInputChemicalFormulas(QString s)
     eleMinRadii.set(atomcn, r);
   }
 
+  return true;
+}
+
+bool XtalOpt::processFixedStoichiometry(QString s)
+{
+  CellComp out;
+  QString input = s.simplified();
+
+  if (input.isEmpty()) {
+    fixedStoich.clear();
+    return true;
+  }
+
+  if (compList.isEmpty()) {
+    qDebug() << "Error processFixedStoichiometry: composition is not set.";
+    return false;
+  }
+
+  const QStringList chemSystem = getChemicalSystem();
+  const QStringList entries = input.split(',', QString::SkipEmptyParts);
+
+  for (const auto& rawEntry : entries) {
+    const QString entry = rawEntry.simplified();
+    const QStringList pair = entry.split('=', QString::SkipEmptyParts);
+    if (pair.size() != 2) {
+      qDebug() << "Error: invalid fixed stoichiometry entry '" << entry << "'";
+      return false;
+    }
+
+    const CellComp parsedElement = formulaToComposition(pair[0].simplified() + "1");
+    if (parsedElement.getNumTypes() != 1) {
+      qDebug() << "Error: invalid element in fixed stoichiometry entry '" << entry << "'";
+      return false;
+    }
+
+    const QString symbol = parsedElement.getSymbols()[0];
+    bool ok = false;
+    const uint count = pair[1].simplified().toUInt(&ok);
+    if (!ok) {
+      qDebug() << "Error: invalid atom count in fixed stoichiometry entry '" << entry << "'";
+      return false;
+    }
+
+    if (!chemSystem.contains(symbol)) {
+      qDebug() << "Error: unknown element '" << symbol
+               << "' in fixed stoichiometry list.";
+      return false;
+    }
+
+    out.set(symbol, ElementInfo::getAtomicNum(symbol.toStdString()), count);
+  }
+
+  for (const auto& comp : compList) {
+    for (const auto& symbol : out.getSymbols()) {
+      if (comp.getCount(symbol) != out.getCount(symbol)) {
+      qDebug() << "Error: fixed stoichiometry is incompatible with the input chemical formulas.";
+      return false;
+      }
+    }
+  }
+
+  fixedStoich = out;
   return true;
 }
 
@@ -4557,6 +4645,7 @@ void XtalOpt::printOptionSettings(QTextStream& stream, XtalOpt* x)
 
   stream << "\n### Search Parameters ###\n";
   stream << "  chemicalFormulas = " << x->input_formulas_string << "\n";
+  stream << "  fixedStoichiometry = " << x->input_fixed_stoich_string << "\n";
   stream << "  referenceEnergies = " << x->input_ene_refs_string << "\n";
   stream << "  vcSearch = " << toString(x->vcSearch) << "\n";
   stream << "  minAtoms = " << x->minAtoms << "\n";
