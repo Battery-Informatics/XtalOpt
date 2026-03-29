@@ -44,6 +44,7 @@ static const QStringList keywords = { "minVolumeScale",
                                       "elementalVolumes",
                                       "maxAtoms",
                                       "minAtoms",
+                                      "fixedStoichiometry",
                                       "vcSearch",
                                       "saveHullSnapshots",
                                       "verboseOutput",
@@ -399,6 +400,13 @@ bool XtalOptCLIOptions::processOptions(const QHash<QString, QString>& options,
   // Is this a variable-composition search?
   xtalopt.vcSearch = toBool(options.value("vcSearch", "false"));
 
+  xtalopt.input_fixed_stoich_string =
+    options.value("fixedStoichiometry", "");
+  if (!xtalopt.processFixedStoichiometry(xtalopt.input_fixed_stoich_string)) {
+    qDebug() << "Error: fixed stoichiometry was not read in successfully!";
+    return false;
+  }
+
   // Should we save hull snapshots?
   xtalopt.m_saveHullSnapshots = toBool(options.value("saveHullSnapshots", "false"));
 
@@ -437,6 +445,18 @@ bool XtalOptCLIOptions::processOptions(const QHash<QString, QString>& options,
              << "than minAtoms; resetting it to "
              << minimum_atoms_in_compositions;
     xtalopt.minAtoms = minimum_atoms_in_compositions;
+  }
+
+  const int fixed_atoms = xtalopt.fixedStoich.getNumAtoms();
+  if (fixed_atoms > xtalopt.maxAtoms) {
+    qDebug() << "\nWarning: fixed stoichiometry requires at least"
+             << fixed_atoms << "atoms; resetting maxAtoms.";
+    xtalopt.maxAtoms = fixed_atoms;
+  }
+  if (fixed_atoms > xtalopt.minAtoms) {
+    qDebug() << "\nWarning: fixed stoichiometry requires at least"
+             << fixed_atoms << "atoms; resetting minAtoms.";
+    xtalopt.minAtoms = fixed_atoms;
   }
 
   // Process the seed structures list input.

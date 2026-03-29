@@ -1695,6 +1695,45 @@
         </property>
        </widget>
       </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_fixed_stoich">
+        <property name="font">
+         <font>
+          <pointsize>11</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Fixed stoichiometry</string>
+        </property>
+        <property name="buddy">
+         <cstring>edit_fixed_stoich</cstring>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1" colspan="5">
+       <widget class="QLineEdit" name="edit_fixed_stoich">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>11</pointsize>
+         </font>
+        </property>
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optional fixed atom counts for a subset of the chemical system. Any generated structure must keep these element counts exactly, while the other elements may still vary in a variable-composition search.&lt;/p&gt;&lt;p&gt;Use a comma-delimited list such as &amp;quot;Li=1, O=2&amp;quot;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+       </widget>
+      </item>
       <item row="3" column="0">
        <widget class="QLabel" name="label_7">
         <property name="text">
@@ -1794,6 +1833,7 @@
  </widget>
  <tabstops>
   <tabstop>edit_composition</tabstop>
+  <tabstop>edit_fixed_stoich</tabstop>
   <tabstop>table_comp</tabstop>
   <tabstop>edit_ref_enes</tabstop>
   <tabstop>cb_interatomicDistanceLimit</tabstop>
